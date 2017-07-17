@@ -43,6 +43,7 @@ tf_parsed <- tf_raw %>%
 
 ```{r}
 tf_commits_by_author <- tf_parsed %>% group_by(commit_month, author) %>% summarise(num_author_commits=n())
+
 tf_authors <- tf_commits_by_author %>% group_by(commit_month) %>% summarise(num_authors=n())
 tf_commits_by_month <- tf_parsed %>% group_by(commit_month) %>% summarise(num_commits=n())
 tf_authors_commits = merge(tf_authors, tf_commits_by_month, by=c("commit_month"))
@@ -64,6 +65,18 @@ ggplot(data = tf_authors_commits, aes(x = factor(commit_month), y = num_authors)
   theme(axis.text.x = element_text(angle = 90, hjust = 1))
 
 ggsave("png/tensorflow_actors_per_month.png")
+```
+
+```{r}
+tf_authors_commits <- tf_authors_commits %>% mutate(authors_cumsum = cumsum(num_authors))
+
+ggplot(data = tf_authors_commits, aes(x = factor(commit_month), y = authors_cumsum)) +
+  geom_bar(stat="identity") +
+  ylab("Commit Authors") +
+  xlab("Month") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+ggsave("png/tensorflow_actors_per_month_cumsum.png")
 ```
 
 ## Unique Authors vs Total Commits per Month
@@ -104,4 +117,5 @@ ggplot(data = tf_commits_by_author %>% filter(author != "A. Unique TensorFlower"
 
 ggsave("png/commits_per_nonbot_author_per_month.png")
 ```
+
 

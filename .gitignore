@@ -35,3 +35,7 @@ vignettes/*.pdf
 
 # local tensorflow repo
 tensorflow/
+
+# ignore large data downloads
+downloads/
+
