@@ -26,7 +26,7 @@ tf_path <- "tensorflow"
 
 # TODO get latest SHA, save outfile as datetimestamp_SHA_tf_gitlog.txt
 tf_outfile <- ''
-system('cd tensorflow; git log --date=short --pretty=format:"%ad %an" > ../data/tensorflow_gitlog.txt')
+system('cd tensorflow; git log --no-merges --date=short --pretty=format:"%ad %an" > ../data/tensorflow_gitlog.txt')
 system("sed 's/ /|/' data/tensorflow_gitlog.txt > data/tensorflow_gitlog_modified.txt")
 ```
 
@@ -82,7 +82,7 @@ ggsave("png/tensorflow_actors_per_month_cumsum.png")
 ## Unique Authors vs Total Commits per Month
 
 ```{r}
-tf_authors_commits_long <- melt(tf_authors_commits, id="commit_month")
+tf_authors_commits_long <- melt(tf_authors_commits %>% select(commit_month, num_authors, num_commits), id="commit_month")
 
 ggplot(data = tf_authors_commits_long, aes(x = factor(commit_month), y = value, fill = variable)) +
   geom_bar(stat="identity", position="dodge") +
