@@ -1,0 +1,107 @@
+---
+title: "Tensorflow Authors by Month"
+author: "Augustina Ragwitz"
+date: "July 17, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(reshape2)
+library(zoo)
+```
+
+# Data Collection
+
+## Commit History via Git Log
+
+```{r}
+# TODO check for tensorflow directory, if none create via git clone, otherwise git pull to update
+tf_path <- "tensorflow"
+
+# TODO get latest SHA, save outfile as datetimestamp_SHA_tf_gitlog.txt
+tf_outfile <- ''
+system('cd tensorflow; git log --date=short --pretty=format:"%ad %an" > ../data/tensorflow_gitlog.txt')
+system("sed 's/ /|/' data/tensorflow_gitlog.txt > data/tensorflow_gitlog_modified.txt")
+```
+
+```{r}
+tf_raw <- read.csv("data/tensorflow_gitlog_modified.txt", header = FALSE, sep = "|",
+                     col.names=c("git_log_date", "author"))
+tf_parsed <- tf_raw %>% 
+  mutate(commit_date=as.Date(git_log_date),
+         commit_month=as.yearmon(commit_date)) %>% 
+  select(commit_date, commit_month, author)
+```
+
+## Summarize by Month
+
+```{r}
+tf_commits_by_author <- tf_parsed %>% group_by(commit_month, author) %>% summarise(num_author_commits=n())
+tf_authors <- tf_commits_by_author %>% group_by(commit_month) %>% summarise(num_authors=n())
+tf_commits_by_month <- tf_parsed %>% group_by(commit_month) %>% summarise(num_commits=n())
+tf_authors_commits = merge(tf_authors, tf_commits_by_month, by=c("commit_month"))
+
+tf_commits_by_author <- merge(tf_commits_by_author, tf_commits_by_month, by=c("commit_month"))
+tf_commits_by_author <- tf_commits_by_author %>% 
+  mutate(commits_pct = round(num_author_commits/num_commits, 2))
+```
+
+# Analysis
+
+## Unique Authors per Month
+
+```{r}
+ggplot(data = tf_authors_commits, aes(x = factor(commit_month), y = num_authors)) +
+  geom_bar(stat="identity") +
+  ylab("Commit Authors") +
+  xlab("Month") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+ggsave("png/tensorflow_actors_per_month.png")
+```
+
+## Unique Authors vs Total Commits per Month
+
+```{r}
+tf_authors_commits_long <- melt(tf_authors_commits, id="commit_month")
+
+ggplot(data = tf_authors_commits_long, aes(x = factor(commit_month), y = value, fill = variable)) +
+  geom_bar(stat="identity", position="dodge") +
+  ylab("Count") +
+  xlab("Month") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+ggsave("png/authors_vs_commits_per_month.png")
+```
+
+## Proportion of Commits per Author
+
+```{r}
+ggplot(data = tf_commits_by_author, 
+       aes(x = factor(commit_month), y = commits_pct, fill=author)) +
+  geom_bar(stat="identity", position="stack") +
+  ylab("Commits") +
+  xlab("Month") +
+  theme(legend.position="none") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+ggsave("png/commits_per_author_per_month.png")
+
+# Excluded the "bot" account
+ggplot(data = tf_commits_by_author %>% filter(author != "A. Unique TensorFlower"), 
+       aes(x = factor(commit_month), y = commits_pct, fill=author)) +
+  geom_bar(stat="identity", position="stack") +
+  ylab("Commits") +
+  xlab("Month") +
+  theme(legend.position="none") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+ggsave("png/commits_per_nonbot_author_per_month.png")
+```
+
