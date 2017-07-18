@@ -26,13 +26,13 @@ tf_path <- "tensorflow"
 
 # TODO get latest SHA, save outfile as datetimestamp_SHA_tf_gitlog.txt
 tf_outfile <- ''
-system('cd tensorflow; git log --no-merges --date=short --pretty=format:"%ad %an" > ../data/tensorflow_gitlog.txt')
-system("sed 's/ /|/' data/tensorflow_gitlog.txt > data/tensorflow_gitlog_modified.txt")
+system('cd tensorflow; git log --date=short --pretty=tformat:"%ad|%an" > ../data/tensorflow_gitlog.txt')
 ```
 
 ```{r}
-tf_raw <- read.csv("data/tensorflow_gitlog_modified.txt", header = FALSE, sep = "|",
+tf_raw <- read.csv("data/tensorflow_gitlog.txt", header = FALSE, sep = "|", quote="",
                      col.names=c("git_log_date", "author"))
+
 tf_parsed <- tf_raw %>% 
   mutate(commit_date=as.Date(git_log_date),
          commit_month=as.yearmon(commit_date)) %>% 
@@ -44,8 +44,10 @@ tf_parsed <- tf_raw %>%
 ```{r}
 tf_commits_by_author <- tf_parsed %>% group_by(commit_month, author) %>% summarise(num_author_commits=n())
 
-tf_authors <- tf_commits_by_author %>% group_by(commit_month) %>% summarise(num_authors=n())
-tf_commits_by_month <- tf_parsed %>% group_by(commit_month) %>% summarise(num_commits=n())
+tf_authors <- tf_commits_by_author %>% group_by(commit_month) %>% 
+  summarise(num_authors=n(), num_authors_adj=num_authors-(num_authors*.22))
+tf_commits_by_month <- tf_parsed %>% group_by(commit_month) %>% 
+  summarise(num_commits=n())
 tf_authors_commits = merge(tf_authors, tf_commits_by_month, by=c("commit_month"))
 
 tf_commits_by_author <- merge(tf_commits_by_author, tf_commits_by_month, by=c("commit_month"))
@@ -54,6 +56,16 @@ tf_commits_by_author <- tf_commits_by_author %>%
 ```
 
 # Analysis
+
+## Unique Authors Total
+
+```{r}
+tf_authors_total <- tf_parsed %>% group_by(author) %>% summarise(num_total_commits=n())
+total_authors <- nrow(tf_authors_total)
+total_authors
+round(total_authors - (total_authors * .068))
+```
+
 
 ## Unique Authors per Month
 
@@ -64,7 +76,15 @@ ggplot(data = tf_authors_commits, aes(x = factor(commit_month), y = num_authors)
   xlab("Month") +
   theme(axis.text.x = element_text(angle = 90, hjust = 1))
 
-ggsave("png/tensorflow_actors_per_month.png")
+ggsave("png/tensorflow_authors_per_month.png")
+
+ggplot(data = tf_authors_commits, aes(x = factor(commit_month), y = num_authors_adj)) +
+  geom_bar(stat="identity") +
+  ylab("Commit Authors") +
+  xlab("Month") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+ggsave("png/tensorflow_authors_per_month_adj.png")
 ```
 
 ```{r}
@@ -77,12 +97,47 @@ ggplot(data = tf_authors_commits, aes(x = factor(commit_month), y = authors_cums
   theme(axis.text.x = element_text(angle = 90, hjust = 1))
 
 ggsave("png/tensorflow_actors_per_month_cumsum.png")
+
+tf_authors_commits <- tf_authors_commits %>% mutate(authors_cumsum_adj = cumsum(num_authors_adj))
+
+ggplot(data = tf_authors_commits, aes(x = factor(commit_month), y = authors_cumsum_adj)) +
+  geom_bar(stat="identity") +
+  ylab("Commit Authors") +
+  xlab("Month") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+ggsave("png/tensorflow_actors_per_month_cumsum_adj.png")
 ```
+
+## Compare Authors to the Pulse Report
+
+According to the Github Pulse Report, "Excluding merges, 155 authors have pushed 838 commits to master and 850 commits to all branches. On master, 2,554 files have changed and there have been 147,210 additions and 122,083 deletions."
+
+![screenshot from Github Pulse Report - July 17, 2017](png/tf_github_pulse_2017-07-17.png)
+
+```{r}
+tf_pulse_check <- tf_parsed %>% filter(commit_date >= as.Date("2017-06-17"))
+
+tf_pulse_check_commits_by_author <- tf_pulse_check %>% 
+  group_by(commit_month, author) %>% 
+  summarise(num_author_commits=n())
+
+tf_pulse_check_authors <- tf_pulse_check_commits_by_author %>% 
+  group_by(commit_month) %>% 
+  summarise(num_authors=n())
+
+total_authors_pulse_check <- sum(tf_pulse_check_authors$num_authors)
+total_authors_pulse_check
+
+total_authors_pct_diff <- (total_authors_pulse_check-155)/total_authors_pulse_check
+total_authors_pulse_check - (total_authors_pulse_check * total_authors_pct_diff)
+```
+
 
 ## Unique Authors vs Total Commits per Month
 
 ```{r}
-tf_authors_commits_long <- melt(tf_authors_commits %>% select(commit_month, num_authors, num_commits), id="commit_month")
+tf_authors_commits_long <- melt(tf_authors_commits, id="commit_month")
 
 ggplot(data = tf_authors_commits_long, aes(x = factor(commit_month), y = value, fill = variable)) +
   geom_bar(stat="identity", position="dodge") +
