@@ -1,8 +1,12 @@
-# tensorflow-gitlog
+# tensorflow-reports
+
+View the current report here - http://rpubs.com/auggy/tensorflow_reports
+
+## Running the Notebook
 
 You will need to clone the tensorflow repository into the project folder for this notebook to work properly.
 
-cd tensorflow-gitlog
+cd tensorflow-reports
 
 git clone git@github.com:tensorflow/tensorflow.git
 
