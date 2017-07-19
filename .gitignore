@@ -39,3 +39,9 @@ tensorflow/
 # ignore large data downloads
 downloads/
 
+# ignore knitr output
+*.html
+
+# ignore docs published to Rstudio
+rsconnect/
+
