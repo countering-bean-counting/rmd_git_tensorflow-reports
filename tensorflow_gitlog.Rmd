@@ -1,5 +1,5 @@
 ---
-title: "Tensorflow Authors by Month"
+title: "Tensorflow Contributors"
 author: "Augustina Ragwitz"
 date: "July 17, 2017"
 output: html_document
@@ -16,6 +16,7 @@ library(readr)
 library(reshape2)
 library(zoo)
 ```
+
 
 # Data Collection
 
@@ -34,64 +35,175 @@ system('cd tensorflow; git log --date=short --pretty=tformat:"%ad|%an" > ../data
 tf_raw <- read.csv("data/tensorflow_gitlog.txt", header = FALSE, sep = "|", quote="",
                      col.names=c("git_log_date", "author"))
 
-tf_parsed <- tf_raw %>% 
+tf_parsed_dates <- tf_raw %>% 
   mutate(commit_date=as.Date(git_log_date),
          commit_month=as.yearmon(commit_date)) %>% 
   select(commit_date, commit_month, author)
 ```
 
+# Gitlog Commit Authors by Month
+
 ## Summarize by Month
 
 ```{r}
+tf_parsed <- tf_parsed_dates %>%  filter(commit_month < 'Jul 2017') # exclude July data
+
 tf_commits_by_author <- tf_parsed %>% group_by(commit_month, author) %>% summarise(num_author_commits=n())
 
 tf_authors <- tf_commits_by_author %>% group_by(commit_month) %>% 
   summarise(num_authors=n())
+
 tf_commits_by_month <- tf_parsed %>% group_by(commit_month) %>% 
   summarise(num_commits=n())
+
 tf_authors_commits = merge(tf_authors, tf_commits_by_month, by=c("commit_month"))
 
 tf_commits_by_author <- merge(tf_commits_by_author, tf_commits_by_month, by=c("commit_month"))
+tf_commits_by_author <- merge(tf_commits_by_author, tf_authors, by=c("commit_month"))
 tf_commits_by_author <- tf_commits_by_author %>% 
-  mutate(commits_pct = round(num_author_commits/num_commits, 2))
+  mutate(commits_pct = num_author_commits/num_commits, 
+         author_commits_log = round(log(num_author_commits)))
+
 ```
 
-# Analysis
+
+```{r}
+tf_commits_freq_by_author <- tf_commits_by_author %>% 
+  group_by(author, author_commits_log) %>%
+  summarise(commits_log_freq = n(), # frequency of this proportion of commits
+            commits_max = max(num_author_commits),
+            commits_min = min(num_author_commits),
+            commits_pct_max = round(max(commits_pct), 4),
+            commits_pct_min = round(min(commits_pct), 4)) %>% 
+  group_by(author) %>%
+  mutate(commits_log_most_freq = max(commits_log_freq)) %>%
+  filter(commits_log_most_freq == commits_log_freq) # only get the most frequent percents
+
+tf_commits_freq_by_author_summary <- tf_commits_freq_by_author %>%
+  group_by(author) %>%
+  summarise(
+    freq_strength=n(), # variability
+    commits_log_min = min(author_commits_log),
+    commits_log_max = max(author_commits_log),
+    commits_pct_min = min(commits_pct_min),
+    commits_pct_max = max(commits_pct_max),
+    commits_log_freq = first(commits_log_most_freq)
+  ) %>% mutate(commits_freq_score = round((commits_log_freq/freq_strength)/commits_log_freq, 1))
+
+tf_commits_by_author <- merge(tf_commits_by_author, 
+                              tf_commits_freq_by_author_summary %>% 
+                                select(author, commits_pct_max, commits_log_max, 
+                                       commits_freq_score),
+                              by="author")
+```
+
 
 ## Unique Authors Total
 
+Further down, Github reports the total "contributors" is 995. The discrepancy can be explained by Gitub's ability to normalize committers by Github login. If the same person commits from a different location with different author settings in their git config, they will have a different name in the commit log. Github can associate that person with a user but we cannot just from the commit log.
+
+Therefore, we report a higher number of unique users than Github reports which explains this discrepancy (see below for more detail).
+
 ```{r}
-tf_authors_total <- tf_parsed %>% group_by(author) %>% summarise(num_total_commits=n())
+tf_authors_total <- tf_parsed_dates %>% group_by(author) %>% summarise(num_total_commits=n())
 total_authors <- nrow(tf_authors_total)
 total_authors
-```
 
+total_authors - 995
+```
 
 ## Unique Authors per Month
 
-```{r}
-ggplot(data = tf_authors_commits, aes(x = factor(commit_month), y = num_authors)) +
-  geom_bar(stat="identity") +
-  ylab("Commit Authors") +
-  xlab("Month") +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1))
-```
-
-
-## Unique Authors vs Total Commits per Month
+The number of unique authors has grown steadily per month. March 2017 shows a spike, so it could be interesting to see if this is due to the author/login discrepancy in the commit log or if this is real, and some other event happened to cause it.
 
 ```{r}
-tf_authors_commits_long <- melt(tf_authors_commits %>% select(commit_month, num_authors, num_commits), 
-                                id="commit_month")
-
-ggplot(data = tf_authors_commits_long, aes(x = factor(commit_month), y = value, fill = variable)) +
-  geom_bar(stat="identity", position="dodge") +
+ggplot(data = tf_authors_commits, aes(x = factor(commit_month))) +
+  geom_point(aes(y = num_authors, color="Authors"), group=1) +
+  geom_line(aes(y = num_authors, color="Authors"), group=1) +
   ylab("Count") +
   xlab("Month") +
   theme(axis.text.x = element_text(angle = 90, hjust = 1))
 ```
 
+## Unique Authors vs Total Commits per Month
+
+Overall in the Tensorflow project, the number of authors and commits are not only increasing but appear to be correlated. We'll explore that correlation further, but logically one can assume that more authors means more commits.
+
+```{r}
+ggplot(data = tf_authors_commits, aes(x = factor(commit_month))) +
+  geom_point(aes(y = num_authors*5, color="Authors (scaled)"), group=1) +
+  geom_line(aes(y = num_authors*5, color="Authors (scaled)"), group=1) +
+  geom_point(aes(y = num_commits, color="Commits"), group=2) +
+  geom_line(aes(y = num_commits, color="Commits"), group=2) +
+  ylab("Count") +
+  xlab("Month") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+ggplot(data = tf_authors_commits, aes(x = num_commits, y = num_authors)) +
+  geom_point() +
+  geom_smooth(method="lm", se=FALSE) +
+  xlab("Commits") +
+  ylab("Authors")
+```
+
+## Unique Authors vs Commits per Author per Month
+
+How are commits per author distributed as the number of authors per month increases?
+
+As the number of authors increases the proportion of commits becomes more evenly distributed, so we see a downward trend in percent of commits per author. Early on in the project, more authors had a higher proportion of the commits.
+
+The second plot filters out the "A. Unique TensorFlower" bot which is clearly responsible for the largest proportion of commits as the number of authors increases.
+
+
+```{r}
+ggplot(data = tf_commits_by_author, aes(x = num_authors)) +
+  geom_jitter(aes(y=num_author_commits, color="Commits")) +
+  geom_jitter(aes(y=commits_pct * 1000, color="Commits %")) + # scaled for comparison
+  geom_smooth(aes(y=commits_pct*1000), method="lm", se=FALSE) +
+  xlab("Authors") +
+  ylab("Commits per Author")
+
+ggplot(data = tf_commits_by_author %>% filter(author != "A. Unique TensorFlower"), 
+       aes(x = num_authors)) +
+  geom_jitter(aes(y=num_author_commits, color="Commits")) +
+  geom_jitter(aes(y=commits_pct * 1000, color="Commits %")) + # scaled for comparison
+  geom_smooth(aes(y=commits_pct*1000), method="lm", se=FALSE) +
+  xlab("Authors") +
+  ylab("Commits per Author")
+
+```
+
+## Most Frequent Commit Pattern
+
+This looks at the same plot above but adds the dimension of what's "normal" for the authors in the plot. Do they appear to be consistent with their most common values or do they tend to vary a lot?
+
+Generally authors are consistent. We don't see a lot of cases where authors who typically have a low number of commits having random spikes of high numbers of commits.
+
+One caveat to keep in mind is some commits being evaluated as belonging to seperate authors may belong to the same author. Github reports 73 less authors than were determined using the author's name from the commit. At a minimum there seems to at least be consistency in commit activity per author name.
+
+```{r}
+ggplot(data = tf_commits_by_author, 
+       aes(x = num_authors, y=num_author_commits, 
+           colour=factor(commits_log_max))) +
+  geom_jitter() +
+  xlab("Authors") +
+  ylab("Commits per Author") +
+  guides(colour=guide_legend(title="Most Freq Log"))
+
+ggplot(data = tf_commits_by_author %>% filter(author != "A. Unique TensorFlower"), 
+       aes(x = num_authors, y=num_author_commits, 
+           colour=factor(commits_log_max))) +
+  geom_jitter() +
+  xlab("Authors") +
+  ylab("Commits per Author") +
+  guides(colour=guide_legend(title="Most Freq Log"))
+```
+
 ## Proportion of Commits per Author
+
+Early on in the project there were less authors as is indicated by the higher proportion of commits. As the project has progressed however, the number of commits is more distributed.
+
+The "bot" is the only author consistently responsible for a high proportion of the commit activity.
 
 ```{r}
 ggplot(data = tf_commits_by_author, 
@@ -114,6 +226,8 @@ ggplot(data = tf_commits_by_author %>% filter(author != "A. Unique TensorFlower"
 
 ## Compare Authors to the Pulse Report
 
+How different are metrics in the Gitlog compared to what Github reports?
+
 According to the Github Pulse Report, "Excluding merges, 155 authors have pushed 838 commits to master and 850 commits to all branches. On master, 2,554 files have changed and there have been 147,210 additions and 122,083 deletions."
 
 ![screenshot from Github Pulse Report - July 17, 2017](png/tf_github_pulse_2017-07-17.png)
@@ -132,29 +246,23 @@ tf_pulse_check_authors <- tf_pulse_check_commits_by_author %>%
 total_authors_pulse_check <- sum(tf_pulse_check_authors$num_authors)
 total_authors_pulse_check
 
-total_authors_pct_diff <- (total_authors_pulse_check-155)/total_authors_pulse_check
-total_authors_pulse_check - (total_authors_pulse_check * total_authors_pct_diff)
+155 - total_authors_pulse_check
 ```
+
+## Git Log Analysis Conclusions
+
+The key advantage of git log analysis is the lack of API overhead. The key disadvantage is the inability to easily consolidate authors. While the inability to consolidate authors may potentially misrepresent the distribution of commits, a growing project that regularly has new authors each month can potentially balance this out.
+
+The analysis of Tensorflow's commit history suggests that a growing project will trend towards a smaller proportion of overall commits per month per author. Additionally, non-human users in such projects can be identified by a significantly higher proportion of commits than the other authors.
 
 # Github Contributors
 
+While commits can provide some insight into a project's overall growth and activity levels, not all contributions come in the form of commits. Github is an excellent resource for tracking this activity and they provide an archive of all public events going back to 2010. This section explores how the Github events activity for the tensorflow repository indicates a growing project.
+
 The main page of the repo has a Contributors number but it's not clear how that is calculated. Their 2016 State of the Octoverse report (https://octoverse.github.com/) provided a defintion for the numbers in that report as: "unique contributors (users who pushed code, opened or commented on an issue or PR), unique code reviewers (users who commented on the changed files), and most forks".
 
-The Github Archive provides a record of all public Github Events. Events that encompassed the entire Tensorflow organization were included, however this report will only look directly at the tensorflow repository.
-
-## Setting up the Github Events
-
-This section outlines how the datasets were created. The code to reproduce this process is in a code block below.
-
-This is outlined here in stages to allow for verification at each stage. The code in the block below will do it one step.
-
-1. Select events from the Github Archive going back to 2015:
-https://bigquery.cloud.google.com/savedquery/306220071795:5c2975a4930245e184d1b87c40575821
-
-2. Per Octoverse definition above, select the following event types:
-https://bigquery.cloud.google.com/savedquery/306220071795:3c3f978b47324b44a954f026a79556d7
-
 Contributor Activity Described by Octoverse:
+
  * PushEvent
  * PullRequestReviewCommentEvent
  * PullRequestEvent
@@ -162,26 +270,28 @@ Contributor Activity Described by Octoverse:
  * IssueCommentEvent
  * ForkEvent
  * CommitCommentEvent
+ 
+ This section will explore these specific Github event types.
+
+## Setting up the Github Events
+
+This section outlines how the datasets were created.
+
+1. Select events from the Github Archive going back to 2015:
+https://bigquery.cloud.google.com/savedquery/306220071795:5c2975a4930245e184d1b87c40575821
+
+2. Per Octoverse definition above, select the following event types:
+https://bigquery.cloud.google.com/savedquery/306220071795:3c3f978b47324b44a954f026a79556d7
 
 3. For purposes of this study, we are only interested in the 'tensorflow/tensorflow' repository.
 https://bigquery.cloud.google.com/savedquery/306220071795:5d53bc77299c4a1195df258a04caa646
 
 4. Export the resulting table to Cloud Storage (GBQ API will only return a limited dataset). Make public and get public link.
 
-
-5. Download and read into R!
+5. Download, extract, and read into R! (may need to add the ".csv" suffix)
 https://storage.googleapis.com/open_source_community_metrics_exports/githubarchive_contributor_events_tf_repo_only.gz
 
-```{r, include=FALSE}
-
-# select from gh archive data and save to another dataset
-# TODO code to do so via GBQ client
-
-```
-
-Read in the CSV archive.
-
-```{r}
+```{r include=FALSE}
 tf_gh_events <- read_csv('downloads/githubarchive_contributor_events_tf_repo_only.csv')
 
 tf_gh_events <- tf_gh_events %>% 
@@ -200,7 +310,7 @@ tf_gh_events_types <- tf_gh_events %>%
   mutate(total_events=sum(num_events))
 ```
 
-## Octoverse Stats
+## Octoverse Contributor Metrics
 
 ### Unique Contributors (users who pushed code, opened or commented on an issue or PR)
 ```{r}
@@ -239,31 +349,32 @@ tf_gh_reviewers <- tf_gh_events_types %>%
   mutate(metric="Reviewers")
 ```
 
-### Combined
+### Summary
+
+Overall there is a trend towards growth in the 3 Actor categories proposed by the Octoverse report. Reviewers show the most growth. Forkers and Contributors appear to follow a very similar pattern. It would be interesting to see if this is indicative of a correlation.
 
 ```{r}
 tf_gh_octoverse <- rbind(tf_gh_contributors, tf_gh_forkers, tf_gh_reviewers)
+rm(tf_gh_forkers, tf_gh_contributors, tf_gh_reviewers)
+```
+
+```{r}
+ggplot(data = tf_gh_octoverse, 
+       aes(x = factor(event_month))) +
+  geom_line(aes(colour=metric, y=num_actors, group=metric)) +
+  geom_point(aes(colour=metric, y=num_actors, group=metric)) +
+  ylab("Actors") +
+  xlab("Month") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
 
 ggplot(data = tf_gh_octoverse, 
-       aes(x = factor(event_month), y = num_actors, fill=metric)) +
-  geom_bar(stat="identity", position="dodge") +
-  ylab("Actors") +
+       aes(x = factor(event_month))) +
+  geom_line(aes(colour=metric, y=num_actors, group=metric)) +
+  geom_point(aes(colour=metric, y=num_actors, group=metric)) +
+  ylab("Actors (log)") +
   xlab("Month") +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1))
-
-ggplot(data = tf_gh_octoverse %>% filter(metric != "Forkers"), 
-       aes(x = factor(event_month), y = num_actors, fill=metric)) +
-  geom_bar(stat="identity", position="dodge") +
-  ylab("Actors") +
-  xlab("Month") +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1))
-
-ggplot(data = tf_gh_octoverse %>% filter(metric == "Reviewers"), 
-       aes(x = factor(event_month), y = num_actors, fill=metric)) +
-  geom_bar(stat="identity", position="dodge") +
-  ylab("Actors") +
-  xlab("Month") +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  scale_y_log10()
 
 ```
 
