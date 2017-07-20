@@ -21,18 +21,23 @@ library(zoo)
 
 # Overview
 
-TODO
+This report serves two purposes. The original inspiration came from a request to better understand how Github was determining the contributor metrics it was reporting on it's website for the Tensorflow project. The second purpose is to test and refine participation metrics from other ongoing research efforts that could identify a high activity, growing project.
+
+This notebook lives in Github: https://github.com/missaugustina/tensorflow_reports
 
 # Commit History
 
-TODO
+Use the "git log" command to extract commit history. The "pretty" option allows the log output to be formatted.
 
 ```{r}
 git_log_cmd <- paste('cd ', params$tf_path, 
                      '; git log ', params$tf_sha, 
                      ' --date=short --pretty=tformat:"%ad|%an" > ', params$tf_out, sep='')
 system(git_log_cmd)
+
+git_log_cmd
 ```
+
 
 ```{r}
 tf_raw <- read.csv("data/tensorflow_gitlog.txt", header = FALSE, sep = "|", quote="",
