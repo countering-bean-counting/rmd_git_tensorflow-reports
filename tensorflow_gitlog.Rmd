@@ -43,6 +43,7 @@ git_log_cmd
 tf_raw <- read.csv("data/tensorflow_gitlog.txt", header = FALSE, sep = "|", quote="",
                      col.names=c("git_log_date", "author"))
 
+# add date formatting so these sort properly
 tf_parsed_dates <- tf_raw %>% 
   mutate(commit_date=as.Date(git_log_date),
          commit_month=as.yearmon(commit_date)) %>% 
@@ -54,60 +55,74 @@ tf_parsed_dates <- tf_raw %>%
 ## Summarize by Month
 
 ```{r}
-tf_parsed <- tf_parsed_dates %>%  filter(commit_month < 'Jul 2017') # exclude July data
+# exclude July
+tf_parsed <- tf_parsed_dates %>%  filter(commit_month < 'Jul 2017')
 
-tf_commits_by_author <- tf_parsed %>% group_by(commit_month, author) %>% summarise(num_author_commits=n())
+# commits per author
+tf_commits_by_author <- tf_parsed %>% 
+  group_by(commit_month, author) %>% 
+  summarise(num_author_commits=n())
 
-tf_authors <- tf_commits_by_author %>% group_by(commit_month) %>% 
+# authors per month
+tf_authors <- tf_commits_by_author %>% 
+  group_by(commit_month) %>% 
   summarise(num_authors=n())
 
+# commits per month
 tf_commits_by_month <- tf_parsed %>% group_by(commit_month) %>% 
   summarise(num_commits=n())
 
+# merge authors and commits per month
 tf_authors_commits = merge(tf_authors, tf_commits_by_month, by=c("commit_month"))
 
-tf_commits_by_author <- merge(tf_commits_by_author, tf_commits_by_month, by=c("commit_month"))
-tf_commits_by_author <- merge(tf_commits_by_author, tf_authors, by=c("commit_month"))
+# merge authors + commits per month with commits per author
+tf_commits_by_author <- merge(tf_commits_by_author, tf_authors_commits, by=c("commit_month"))
+
+# Calculate commits per author percent and log
+# the rounded log is used for frequency buckets 
 tf_commits_by_author <- tf_commits_by_author %>% 
-  mutate(commits_pct = num_author_commits/num_commits, 
+  mutate(commits_pct = num_author_commits/num_commits,
          author_commits_log = round(log(num_author_commits)))
 
+# Calculate number of months the author shows up in
+tf_commits_by_author <- tf_commits_by_author %>%
+  group_by(author) %>%
+  mutate(commits_months=n())
+
+# determine min and max for each log bucket
+tf_commits_by_author <- tf_commits_by_author %>% 
+  group_by(author_commits_log) %>%
+  mutate(commits_min = min(num_author_commits), 
+         commits_max = max(num_author_commits))
+
+# clean up
 rm(tf_authors, tf_commits_by_month)
 ```
 
+## Summarize by Author
 
 ```{r}
-tf_commits_freq_by_author <- tf_commits_by_author %>% 
+# remove the "tensorflow bot"
+tf_commits_by_author_nobot <- tf_commits_by_author %>% filter(author != "A. Unique TensorFlower")
+
+tf_commits_by_author_summary <- tf_commits_by_author_nobot %>%
   group_by(author, author_commits_log) %>%
-  summarise(commits_log_freq = n(), # frequency of this proportion of commits
-            commits_max = max(num_author_commits),
-            commits_min = min(num_author_commits),
-            commits_pct_max = round(max(commits_pct), 4),
-            commits_pct_min = round(min(commits_pct), 4)) %>% 
-  group_by(author) %>%
-  mutate(commits_log_most_freq = max(commits_log_freq)) %>%
-  filter(commits_log_most_freq == commits_log_freq) # only get the most frequent percents
-
-tf_commits_freq_by_author_summary <- tf_commits_freq_by_author %>%
-  group_by(author) %>%
   summarise(
-    freq_strength=n(), # variability
-    commits_log_min = min(author_commits_log),
-    commits_log_max = max(author_commits_log),
-    commits_pct_min = min(commits_pct_min),
-    commits_pct_max = max(commits_pct_max),
-    commits_log_freq = first(commits_log_most_freq)
-  ) %>% mutate(commits_freq_score = round((commits_log_freq/freq_strength)/commits_log_freq, 1))
-
-tf_commits_by_author <- merge(tf_commits_by_author, 
-                              tf_commits_freq_by_author_summary %>% 
-                                select(author, commits_pct_max, commits_log_max, 
-                                       commits_freq_score),
-                              by="author")
-
-rm(tf_commits_freq_by_author, tf_commits_freq_by_author_summary)
+    commit_freq = n(),# Months Pattern was Observed
+    commits_months = first(commits_months), 
+    commit_freq_pct = round(commit_freq/commits_months, 2), # proportion of months pattern was observed
+    author_commits_min = min(num_author_commits),
+    author_commits_max = max(num_author_commits),
+    commits_min = first(commits_min), 
+    commits_max = first(commits_max)) %>%
+  group_by(author) %>%
+  mutate(
+    freq_bins = n(), # number of months with different patterns
+    freq_bins_pct = round(freq_bins/commits_months, 2)) # proportion of months w/ same patterns
+# ex: 5 months -> commits log = 1, 1, 2, 3, 2 -> frequency = 1:2, 2:2, 3:1
+# commit_freq_pct: 1:2/5, 2:2/5, 3:1/5 <- out of 5 months how often that commit log was observed
+# freq_bins_pct: 3/5 months share the same commit log
 ```
-
 
 ## Unique Authors Total
 
@@ -116,11 +131,17 @@ Further down, Github reports the total "contributors" is 995. The discrepancy ca
 Therefore, we report a higher number of unique users than Github reports which explains this discrepancy (see below for more detail).
 
 ```{r}
-tf_authors_total <- tf_parsed_dates %>% group_by(author) %>% summarise(num_total_commits=n())
-total_authors <- nrow(tf_authors_total)
-total_authors
+# authors stats
+tf_authors_total <- tf_parsed_dates %>% 
+  group_by(author) %>% 
+  summarise(commits=n())
 
-total_authors - 995
+
+total_authors <- nrow(tf_authors_total)
+
+paste("Total Authors in Git Log:", total_authors)
+
+paste("Difference from Github:", total_authors - 995)
 ```
 
 ## Unique Authors per Month
@@ -184,31 +205,93 @@ ggplot(data = tf_commits_by_author %>% filter(author != "A. Unique TensorFlower"
 
 ```
 
-## Most Frequent Commit Pattern
+## Commits Per Author Frequency
 
-This looks at the same plot above but adds the dimension of what's "normal" for the authors in the plot. Do they appear to be consistent with their most common values or do they tend to vary a lot?
+What is the overall distribution for commits per author? How many commits do most authors make per month?
 
-Generally authors are consistent. We don't see a lot of cases where authors who typically have a low number of commits having random spikes of high numbers of commits.
+Commits per author were grouped into buckets based on the rounded natural log. The maximum value of that set is reported in the density plots below.
 
-One caveat to keep in mind is some commits being evaluated as belonging to seperate authors may belong to the same author. Github reports 73 less authors than were determined using the author's name from the commit. At a minimum there seems to at least be consistency in commit activity per author name.
+The highest per month commit frequency seen is 1-4 per month.
 
 ```{r}
-ggplot(data = tf_commits_by_author, 
-       aes(x = num_authors, y=num_author_commits, 
-           colour=factor(commits_log_max))) +
-  geom_jitter() +
-  xlab("Authors") +
-  ylab("Commits per Author") +
-  guides(colour=guide_legend(title="Most Freq Log"))
+ggplot(tf_commits_by_author_nobot, aes(x=factor(commits_max))) + 
+  geom_density() +
+  xlab("Commits per Author")
 
-ggplot(data = tf_commits_by_author %>% filter(author != "A. Unique TensorFlower"), 
-       aes(x = num_authors, y=num_author_commits, 
-           colour=factor(commits_log_max))) +
-  geom_jitter() +
-  xlab("Authors") +
-  ylab("Commits per Author") +
-  guides(colour=guide_legend(title="Most Freq Log"))
 ```
+
+How many months have authors been contributing? Earlier analysis indicated that there were less authors in 2015 when the project started than there are in 2017.
+
+The majority of Authors only have commits for 6 or less months.
+
+```{r}
+ggplot(tf_commits_by_author_nobot, aes(x=factor(commits_months))) + 
+  geom_bar() +
+  xlab("Author Months")
+```
+
+## Commits per Author Variability
+
+Commit variability is a possible indicator of new committer proportion. As commit activity per author increases, so does the variability of commit activity from month to month. A project with a higher proportion of contributors with fewer months of commit history could be an indication of high developer interest. "Drive bys" are contributions from people do not continue to stay involved with the project, although they may continue to consume it. A high number of "drive bys" could indicate a strong developer user base.
+
+Do authors make roughly the same number of commits each month?
+
+The plot below shows what percentage of months the author comitted on have the same commit activity. In other words, for what percentage of months was the commit pattern observed?
+
+This density plot would indicate that authors are fairly consistent in terms of their monthly commit activity. This consistency is likely due to the fact that the majority of authors have less than 6 months of commits.
+
+```{r}
+ggplot(tf_commits_by_author_summary, 
+       aes(x=commit_freq_pct*100)) + 
+  geom_density() +
+  xlab("% of Months with Observed Commit Pattern")
+
+```
+
+The next plot looks at how much variation there was amongst commit patterns for authors for each month. What percentage of months share an observed commit pattern? If an author has the same commit pattern for 5 out of their 10 months, then 50% of that author's months share a commit pattern. The higher this percentage, the lower the overall variability.
+
+This density plot would indicate that a majority of authors show 100% shared commit pattern. This consistency is likely due to the fact that the majority of authors have less than 6 months of commits.
+
+```{r}
+ggplot(tf_commits_by_author_summary, 
+       aes(x=freq_bins_pct*100)) + 
+  geom_density() +
+  xlab("% of Months with Shared Commit Pattern")
+```
+
+Do authors who have contributed for more than 6 months show more variability in their commit patterns?
+
+Authors with greater than 6 months of commit history represent about 7% of all authors (71/1068). The majority of authors only have one month of commit activity.
+
+```{r}
+ggplot(tf_commits_by_author_summary %>% filter(commits_months > 6), 
+       aes(x=commit_freq_pct*100)) + 
+  geom_bar() +
+  xlab("% of Months with Observed Commit Pattern") +
+  xlim(0,100)
+
+ggplot(tf_commits_by_author_summary %>% filter(commits_months > 6), 
+       aes(x=freq_bins_pct*100)) + 
+  geom_bar() +
+  xlab("% of Months with Shared Commit Pattern") +
+  xlim(0,100)
+
+```
+
+## Commit Author Frequency vs Variability
+
+Another indicator of project participation levels is the overall number of commits per author compared with commit frequency. Do authors that commit more frequently tend to have significantly more commits as well? In the Tensorflow project we see a small increase.
+
+```{r}
+ggplot(tf_commits_by_author_nobot %>% filter(commit_month > "Nov 2015"), 
+       aes(x=factor(commits_months), y=round(commits_pct,2), colour=factor(commits_max))) + 
+  geom_jitter() +
+  xlab("# Months w/ Commits") +
+  ylab("Commits per Author") +
+  guides(colour=guide_legend(title="Commits"))
+
+```
+
 
 ## Proportion of Commits per Author
 
@@ -234,6 +317,21 @@ ggplot(data = tf_commits_by_author %>% filter(author != "A. Unique TensorFlower"
   theme(legend.position="none") +
   theme(axis.text.x = element_text(angle = 90, hjust = 1))
 ```
+
+Does the maximum number of commits represent a smaller proportion of the commits over time? 
+
+If project activity is gradually increasing, then a larger number of commits should gradually represent a smaller proportion of the overall commits per month.
+
+```{r}
+ggplot(tf_commits_by_author_nobot %>% filter(commit_month > "Nov 2015" & author_commits_log > 2), 
+       aes(x=factor(commit_month), y=commits_pct, colour=factor(commits_max))) + 
+  geom_jitter() +
+  xlab("Month") +
+  ylab("Commits per Author (%)") +
+  guides(colour=guide_legend(title="Commits")) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
 
 ## Compare Authors to the Pulse Report
 
@@ -486,7 +584,15 @@ ggplot(data = tf_gh_event_types_summary_total,
 How many events do actors who contribute in the top event type frequencies typically have per type? What's "normal" for active contributors?
 
 
+# Events vs Commits
 
+## Top Committers Event Types
 
+What event types are strongly correlated with commit proportions per the analysis in this report?
+(this will require matching using the Github API)
 
+How about using Github's top committers list?
 
+## Event Type Actors vs Top Committers
+
+How many top actors are missed by only looking at top committers? Are top committers missing from any of the top event types?
