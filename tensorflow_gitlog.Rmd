@@ -3,13 +3,15 @@ title: "Tensorflow Contributors"
 author: "Augustina Ragwitz"
 date: "July 17, 2017"
 output: html_document
+params:
+  tf_path: "tensorflow"
+  tf_sha: 'dd06643c'
+  tf_out: '../data/tensorflow_gitlog.txt'
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-```
 
-```{r}
 library(dplyr)
 library(ggplot2)
 library(readr)
@@ -17,18 +19,19 @@ library(reshape2)
 library(zoo)
 ```
 
+# Overview
 
-# Data Collection
+TODO
 
-## Commit History via Git Log
+# Commit History
+
+TODO
 
 ```{r}
-# TODO check for tensorflow directory, if none create via git clone, otherwise git pull to update
-tf_path <- "tensorflow"
-
-# TODO get latest SHA, save outfile as datetimestamp_SHA_tf_gitlog.txt
-tf_outfile <- ''
-system('cd tensorflow; git log --date=short --pretty=tformat:"%ad|%an" > ../data/tensorflow_gitlog.txt')
+git_log_cmd <- paste('cd ', params$tf_path, 
+                     '; git log ', params$tf_sha, 
+                     ' --date=short --pretty=tformat:"%ad|%an" > ', params$tf_out, sep='')
+system(git_log_cmd)
 ```
 
 ```{r}
@@ -64,6 +67,7 @@ tf_commits_by_author <- tf_commits_by_author %>%
   mutate(commits_pct = num_author_commits/num_commits, 
          author_commits_log = round(log(num_author_commits)))
 
+rm(tf_authors, tf_commits_by_month)
 ```
 
 
@@ -95,6 +99,8 @@ tf_commits_by_author <- merge(tf_commits_by_author,
                                 select(author, commits_pct_max, commits_log_max, 
                                        commits_freq_score),
                               by="author")
+
+rm(tf_commits_freq_by_author, tf_commits_freq_by_author_summary)
 ```
 
 
@@ -235,11 +241,9 @@ According to the Github Pulse Report, "Excluding merges, 155 authors have pushed
 ```{r}
 tf_pulse_check <- tf_parsed %>% filter(commit_date >= as.Date("2017-06-17"))
 
-tf_pulse_check_commits_by_author <- tf_pulse_check %>% 
+tf_pulse_check_authors <- tf_pulse_check %>% 
   group_by(commit_month, author) %>% 
-  summarise(num_author_commits=n())
-
-tf_pulse_check_authors <- tf_pulse_check_commits_by_author %>% 
+  summarise(num_author_commits=n()) %>% 
   group_by(commit_month) %>% 
   summarise(num_authors=n())
 

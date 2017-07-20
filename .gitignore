@@ -45,3 +45,4 @@ downloads/
 # ignore docs published to Rstudio
 rsconnect/
 
+.Rproj.user
