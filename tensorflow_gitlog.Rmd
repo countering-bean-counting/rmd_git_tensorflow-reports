@@ -199,7 +199,7 @@ How are commits per author distributed as the number of authors per month increa
 
 As the number of authors increases the proportion of commits becomes more evenly distributed, so we see a downward trend in percent of commits per author. Early on in the project, more authors had a higher proportion of the commits.
 
-The second plot filters out the "A. Unique TensorFlower" bot which is clearly responsible for the largest proportion of commits as the number of authors increases.
+The second plot filters out the "A. Unique TensorFlower" bot which is clearly responsible for the largest proportion of commits as the number of authors increases. When internal Google commits are pushed upstream, authors that can't be matched to Github accounts get this account instead. 
 
 
 ```{r}
@@ -351,7 +351,7 @@ ggplot(tf_commits_by_author_nobot %>% filter(commit_month > "Nov 2015"),
 
 Early on in the project there were less authors as is indicated by the higher proportion of commits. As the project has progressed however, the number of commits is more distributed.
 
-The "bot" is the only author consistently responsible for a high proportion of the commit activity.
+The "tensor-gardener" is the only "author" consistently responsible for a high proportion of the commit activity. This comes from Google internally when employees make commits and they can't be linked to an existing Github account. The proportion of these "Google" commits appears to be gradually decreasing which could indicate an increase in non-Google authors.
 
 ```{r}
 ggplot(data = tf_commits_by_author, 
@@ -421,3 +421,4 @@ The analysis of Tensorflow's commit history suggests that a growing project will
 Commit months per author is an interesting metric for estimating project popularity. A high proportion of drive-by authors (authors with a low number of commit months or 100% shared commit months) indicates developers are actively using the project.
 
 Additionally, non-human users in projects with a high proportion of drive-by authors can be identified by a significantly higher proportion of commits than the other authors. TODO: how does a non-human author compare to a long-term author?
+
