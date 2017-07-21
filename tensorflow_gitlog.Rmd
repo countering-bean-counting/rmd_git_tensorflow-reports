@@ -1,5 +1,5 @@
 ---
-title: "Tensorflow Contributors"
+title: "Tensorflow Authors"
 author: "Augustina Ragwitz"
 date: "July 17, 2017"
 output: html_document
@@ -21,9 +21,13 @@ library(zoo)
 
 # Overview
 
+Project version control commit histories are the authoritative open history of an open source community. That is not to say that contributions outside of commits are less important or interesting, but version control commit histories are clearly documented points in time associated with a project's artifacts.
+
+Traditional analysis of commit histories tend to focus on simple summary statistics like numbers of commits or lines of code often to create a leaderboard ranking of authors. This report takes history analysis a step further by looking at author trends from a macro level, rather than at an indvidual level. The goal of this analysis is to discover what the commit history can tell us about a project's overall activity level, trends, and growth potential. 
+
 This report serves two purposes. The original inspiration came from a request to better understand how Github was determining the contributor metrics it was reporting on it's website for the Tensorflow project. The second purpose is to test and refine participation metrics from other ongoing research efforts that could identify a high activity, growing project.
 
-This notebook lives in Github: https://github.com/missaugustina/tensorflow_reports
+This notebook lives in Github and is the first in a series: https://github.com/missaugustina/tensorflow_reports
 
 # Commit History
 
@@ -50,9 +54,9 @@ tf_parsed_dates <- tf_raw %>%
   select(commit_date, commit_month, author)
 ```
 
-# Gitlog Commit Authors by Month
+# Data Summaries
 
-## Summarize by Month
+## By Month
 
 ```{r}
 # exclude July
@@ -99,7 +103,7 @@ tf_commits_by_author <- tf_commits_by_author %>%
 rm(tf_authors, tf_commits_by_month)
 ```
 
-## Summarize by Author
+## By Author
 
 ```{r}
 # remove the "tensorflow bot"
@@ -123,6 +127,8 @@ tf_commits_by_author_summary <- tf_commits_by_author_nobot %>%
 # commit_freq_pct: 1:2/5, 2:2/5, 3:1/5 <- out of 5 months how often that commit log was observed
 # freq_bins_pct: 3/5 months share the same commit log
 ```
+
+# Authors
 
 ## Unique Authors Total
 
@@ -156,6 +162,8 @@ ggplot(data = tf_authors_commits, aes(x = factor(commit_month))) +
   xlab("Month") +
   theme(axis.text.x = element_text(angle = 90, hjust = 1))
 ```
+
+# Authors vs Commits
 
 ## Unique Authors vs Total Commits per Month
 
@@ -204,6 +212,8 @@ ggplot(data = tf_commits_by_author %>% filter(author != "A. Unique TensorFlower"
   ylab("Commits per Author")
 
 ```
+
+# Commits per Author
 
 ## Commits Per Author Frequency
 
@@ -333,7 +343,7 @@ ggplot(tf_commits_by_author_nobot %>% filter(commit_month > "Nov 2015" & author_
 ```
 
 
-## Compare Authors to the Pulse Report
+# Github Pulse Report Comparison
 
 How different are metrics in the Gitlog compared to what Github reports?
 
@@ -356,243 +366,14 @@ total_authors_pulse_check
 155 - total_authors_pulse_check
 ```
 
-## Git Log Analysis Conclusions
+# Conclusions
 
-The key advantage of git log analysis is the lack of API overhead. The key disadvantage is the inability to easily consolidate authors. While the inability to consolidate authors may potentially misrepresent the distribution of commits, a growing project that regularly has new authors each month can potentially balance this out.
+The key advantage of git log analysis is that all of the information is available locally (once the repository has been cloned) and does not take up much space. This is particularly advantageous for older projects that may have a large number of commits.
 
-The analysis of Tensorflow's commit history suggests that a growing project will trend towards a smaller proportion of overall commits per month per author. Additionally, non-human users in such projects can be identified by a significantly higher proportion of commits than the other authors.
+The key disadvantage is the inability to easily consolidate authors. While this may potentially misrepresent the distribution of commits for a small author base, a project with a large number of authors should not see a big problem. Number of unique authors can be checked against Github for an approximate margin of error.
 
-# Github Contributors
+The analysis of Tensorflow's commit history suggests that a growing project will trend towards a smaller proportion of overall commits per month per author. The overall number of commits per author on its own does not provide much insight into overall community health or growth. The proportion of commits per author and whether the same number of commits per author goes up or down in proportion, however, is an indicator of activity distribution and is a potentially useful metric.
 
-While commits can provide some insight into a project's overall growth and activity levels, not all contributions come in the form of commits. Github is an excellent resource for tracking this activity and they provide an archive of all public events going back to 2010. This section explores how the Github events activity for the tensorflow repository indicates a growing project.
+Commit months per author is an interesting metric for estimating project popularity. A high proportion of drive-by authors (authors with a low number of commit months or 100% shared commit months) indicates developers are actively using the project.
 
-The main page of the repo has a Contributors number but it's not clear how that is calculated. Their 2016 State of the Octoverse report (https://octoverse.github.com/) provided a defintion for the numbers in that report as: "unique contributors (users who pushed code, opened or commented on an issue or PR), unique code reviewers (users who commented on the changed files), and most forks".
-
-Contributor Activity Described by Octoverse:
-
- * PushEvent
- * PullRequestReviewCommentEvent
- * PullRequestEvent
- * IssuesEvent
- * IssueCommentEvent
- * ForkEvent
- * CommitCommentEvent
- 
- This section will explore these specific Github event types.
-
-## Setting up the Github Events
-
-This section outlines how the datasets were created.
-
-1. Select events from the Github Archive going back to 2015:
-https://bigquery.cloud.google.com/savedquery/306220071795:5c2975a4930245e184d1b87c40575821
-
-2. Per Octoverse definition above, select the following event types:
-https://bigquery.cloud.google.com/savedquery/306220071795:3c3f978b47324b44a954f026a79556d7
-
-3. For purposes of this study, we are only interested in the 'tensorflow/tensorflow' repository.
-https://bigquery.cloud.google.com/savedquery/306220071795:5d53bc77299c4a1195df258a04caa646
-
-4. Export the resulting table to Cloud Storage (GBQ API will only return a limited dataset). Make public and get public link.
-
-5. Download, extract, and read into R! (may need to add the ".csv" suffix)
-https://storage.googleapis.com/open_source_community_metrics_exports/githubarchive_contributor_events_tf_repo_only.gz
-
-```{r include=FALSE}
-tf_gh_events <- read_csv('downloads/githubarchive_contributor_events_tf_repo_only.csv')
-
-tf_gh_events <- tf_gh_events %>% 
-  mutate(event_date = as.Date(created_at), event_month = as.yearmon(event_date),
-         type=ifelse(type=="PullRequestReviewCommentEvent", "PRRCommentEvent", type))
-
-tf_gh_events_types <- tf_gh_events %>%
-  group_by(event_month, type, actor_login) %>% 
-  summarise(num_events=n()) %>% 
-  mutate(num_events_log=round(log(num_events + 1))) %>%
-  group_by(event_month, type) %>%
-  mutate(num_actors = n(), 
-         num_actors_log=round(log(num_actors + 1)), 
-         num_events_type = sum(num_events)) %>% 
-  group_by(event_month) %>%
-  mutate(total_events=sum(num_events))
-```
-
-## Octoverse Contributor Metrics
-
-### Unique Contributors (users who pushed code, opened or commented on an issue or PR)
-```{r}
-tf_gh_contributors <- tf_gh_events_types %>% 
-  filter(
-    type == "PushEvent" | # Pushed Code
-    type == "IssuesEvent" | type == "IssueCommentEvent" | # Opened or commented on Issue or PR
-    type == "PullRequestEvent") %>% # Opened or commented on PR
-  group_by(event_month, actor_login) %>%
-  summarise(num_events=sum(num_events)) %>%
-  group_by(event_month) %>%
-  summarise(num_actors=n(), total_events=sum(num_events)) %>%
-  mutate(metric="Contributors")
-
-```
-
-### Number of Forks
-```{r}
-tf_gh_forkers <- tf_gh_events_types %>% 
-  filter(type == "ForkEvent") %>%
-  group_by(event_month, actor_login) %>%
-  summarise(num_events=sum(num_events)) %>%
-  group_by(event_month) %>%
-  summarise(num_actors=n(), total_events=sum(num_events)) %>%
-  mutate(metric="Forkers")
-```
-
-### Unique Code Reviewers (users who commented on the changed files)
-```{r}
-tf_gh_reviewers <- tf_gh_events_types %>% 
-  filter(type == "CommitCommentEvent" | type == "PRRCommentEvent") %>%
-  group_by(event_month, actor_login) %>%
-  summarise(num_events=sum(num_events)) %>%
-  group_by(event_month) %>%
-  summarise(num_actors=n(), total_events=sum(num_events)) %>%
-  mutate(metric="Reviewers")
-```
-
-### Summary
-
-Overall there is a trend towards growth in the 3 Actor categories proposed by the Octoverse report. Reviewers show the most growth. Forkers and Contributors appear to follow a very similar pattern. It would be interesting to see if this is indicative of a correlation.
-
-```{r}
-tf_gh_octoverse <- rbind(tf_gh_contributors, tf_gh_forkers, tf_gh_reviewers)
-rm(tf_gh_forkers, tf_gh_contributors, tf_gh_reviewers)
-```
-
-```{r}
-ggplot(data = tf_gh_octoverse, 
-       aes(x = factor(event_month))) +
-  geom_line(aes(colour=metric, y=num_actors, group=metric)) +
-  geom_point(aes(colour=metric, y=num_actors, group=metric)) +
-  ylab("Actors") +
-  xlab("Month") +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1))
-
-ggplot(data = tf_gh_octoverse, 
-       aes(x = factor(event_month))) +
-  geom_line(aes(colour=metric, y=num_actors, group=metric)) +
-  geom_point(aes(colour=metric, y=num_actors, group=metric)) +
-  ylab("Actors (log)") +
-  xlab("Month") +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
-  scale_y_log10()
-
-```
-
-
-## Looking for Patterns
-
-```{r}
-tf_gh_events_type_per_actor <- tf_gh_events %>% 
-  group_by(event_month, actor_login, type) %>% 
-  summarise(num_actor_events=n()) %>%
-  group_by(event_month, actor_login) %>%
-  mutate(cnt_types_p_actor=n()) %>%
-  group_by(event_month, type, cnt_types_p_actor) %>%
-  mutate(num_actors_w_type_cnt=n())
-```
-
-```{r}
-tf_gh_event_types_events_log <- tf_gh_events_types %>% 
-  group_by(event_month, type, num_events_log) %>%
-  summarise(actors_cnt=n(), events_min=min(num_events), events_max=max(num_events)) %>%
-  group_by(type, num_events_log) %>% 
-  mutate(num_events_log_freq = n()) %>%
-  group_by(type) %>%
-  mutate(max_num_events_log_freq = max(num_events_log_freq)) %>%
-  filter(max_num_events_log_freq == num_events_log_freq) %>%
-  group_by(type, num_events_log) %>%
-  summarise(events_min=min(events_min), 
-  events_max=max(events_max), 
-  num_events_log_freq=first(num_events_log_freq))
-
-tf_gh_event_types_actors_log <- tf_gh_events_types %>% 
-  group_by(event_month, type, num_actors_log) %>%
-  summarise(actors_min=min(num_actors), actors_max=max(num_actors)) %>%
-  group_by(type, num_actors_log) %>% 
-  mutate(num_actors_log_freq = n()) %>%
-  group_by(type) %>%
-  mutate(max_num_actors_log_freq = max(num_actors_log_freq)) %>%
-  filter(max_num_actors_log_freq == num_actors_log_freq) %>%
-  group_by(type, num_actors_log) %>%
-  summarise(actors_min=min(actors_min), 
-  actors_max=max(actors_max), 
-  num_actors_log_freq=first(num_actors_log_freq))
-  
-```
-
-### Event Type Contribution Frequency
-
-What event types have the most unique actors?
-What are the most frequent event types (per actor)?
-
-```{r}
-ggplot(data = tf_gh_event_types_actors_log, 
-       aes(x = factor(num_actors_log), y = num_actors_log_freq, fill=type)) +
-  geom_bar(stat="identity", position="dodge") +
-  xlab("Actors (log)") +
-  ylab("Freq as Max p/ Month") +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1))
-
-ggplot(data = tf_gh_event_types_events_log, 
-       aes(x = factor(num_events_log), y = num_events_log_freq, fill=type)) +
-  geom_bar(stat="identity", position="dodge") +
-  xlab("Events per Actor (log)") +
-  ylab("Freq as Max p/ Month") +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1))
-
-```
-
-
-### Event Type Diversity per Actor
-
-How many actors contributed how many different event types for each event type? In other words are some event types more strongly associated with actors who contributed a wider range of event types?
-
-For each month, what event type frequency had the most actors for each type?
-
-```{r}
-tf_gh_event_types_summary <- tf_gh_events_type_per_actor %>% 
-  group_by(event_month, type) %>% 
-  mutate(max_actors = max(num_actors_w_type_cnt)) %>%
-  filter(num_actors_w_type_cnt == max_actors) %>%
-  summarise(cnt_types_p_actor=first(cnt_types_p_actor),
-            max_num_actors_w_type_cnt=first(num_actors_w_type_cnt))
-
-tf_gh_event_types_summary_total <- tf_gh_event_types_summary %>%
-  group_by(type, cnt_types_p_actor) %>%
-  summarise(cnt_types_p_actor_freq=n()) %>%
-  group_by(type) %>% mutate(max_type_freq=max(cnt_types_p_actor_freq))
-
-ggplot(data = tf_gh_event_types_summary_total, 
-       aes(x=factor(cnt_types_p_actor), y=cnt_types_p_actor_freq, fill=type)) +
-  geom_bar(stat="identity", position="dodge") +
-  xlab("Event Types p/ Actor") +
-  ylab("Freq of Max p/ Month") +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
-  guides(fill=guide_legend(title="Event Types"))
-
-```
-
-### Events Contributed by Diverse Type Actors
-
-How many events do actors who contribute in the top event type frequencies typically have per type? What's "normal" for active contributors?
-
-
-# Events vs Commits
-
-## Top Committers Event Types
-
-What event types are strongly correlated with commit proportions per the analysis in this report?
-(this will require matching using the Github API)
-
-How about using Github's top committers list?
-
-## Event Type Actors vs Top Committers
-
-How many top actors are missed by only looking at top committers? Are top committers missing from any of the top event types?
+Additionally, non-human users in projects with a high proportion of drive-by authors can be identified by a significantly higher proportion of commits than the other authors. TODO: how does a non-human author compare to a long-term author?
