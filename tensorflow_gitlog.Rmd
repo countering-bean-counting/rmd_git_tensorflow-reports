@@ -99,8 +99,15 @@ tf_commits_by_author <- tf_commits_by_author %>%
   mutate(commits_min = min(num_author_commits), 
          commits_max = max(num_author_commits))
 
+tf_commits_months_single <- tf_commits_by_author %>% 
+  filter(commits_months == 1) %>%
+  group_by(commit_month) %>%
+  summarise(num_authors_single=n())
+
+tf_authors_commits <- merge(tf_authors_commits, tf_commits_months_single, by=c("commit_month"))
+
 # clean up
-rm(tf_authors, tf_commits_by_month)
+rm(tf_authors, tf_commits_by_month, tf_commits_months_single)
 ```
 
 ## By Author
@@ -287,6 +294,43 @@ ggplot(tf_commits_by_author_summary %>% filter(commits_months > 6),
   xlim(0,100)
 
 ```
+
+When did authors with only one commit month make that commit?
+
+```{r}
+ggplot(data = tf_authors_commits, aes(x = factor(commit_month))) +
+  geom_point(aes(y = num_authors_single, color="Singles"), group=2) +
+  geom_line(aes(y = num_authors_single, color="Singles"), group=2) +
+  ylab("Count") +
+  xlab("Month") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+What proportion of authors each month do single authors represent?
+
+Around 25-40% of authors each month will only ever commit for that month. When there are less authors in a particular month, the proportion of single month committers is significantly lower.
+
+```{r}
+tf_authors_commits <- tf_authors_commits %>% mutate(authors_single_pct=num_authors_single/num_authors)
+
+ggplot(data = tf_authors_commits, aes(x = factor(commit_month))) +
+  geom_point(aes(y = num_authors, color="Authors"), group=1) +
+  geom_line(aes(y = num_authors, color="Authors"), group=1) +
+  geom_point(aes(y = num_authors_single, color="Singles"), group=2) +
+  geom_line(aes(y = num_authors_single, color="Singles"), group=2) +
+  ylab("Count") +
+  xlab("Month") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+ggplot(data = tf_authors_commits, aes(x = factor(commit_month), y = authors_single_pct)) +
+  geom_point(group=1) +
+  geom_line(group=1) +
+  ylab("% of Authors w/ 1 Month") +
+  xlab("Month") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+
 
 ## Commit Author Frequency vs Variability
 
