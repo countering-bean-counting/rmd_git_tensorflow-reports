@@ -67,7 +67,8 @@ tf_parsed_dates <- tf_raw %>%
 tf_parsed_emails <- tf_parsed_dates %>% 
   mutate(email=ifelse(email=="danmane@gmail.com"| email=="dandelion@google.com", 
                          "danmane@google.com", email),
-         name=ifelse(name=="yuan (terry) tang", "terry tang", name)) 
+         name=ifelse(name=="yuan (terry) tang", "terry tang", name)) %>%
+  separate(email, c("email_user", "email_host"), "@", remove=FALSE)
 
 rm(tf_parsed_dates)
 ```
@@ -101,23 +102,6 @@ tf_parsed_authors <- merge(tf_parsed_emails, tf_gh_authors_lookup, by=c("email",
 rm(tf_gh_authors_by_email, tf_gh_authors_by_email2, tf_gh_authors_by_name, tf_parsed_emails)
 
 ```
-
-
-
-```{r}
-# Extract github from noreply emails
-
-tf_gh_authors <- tf_parsed_authors %>%
-  group_by(email) %>%
-  summarise(sha_id=first(sha_id)) %>%
-  separate(email, c("email_user", "email_host"), "@") %>%
-  mutate(
-    github_login=ifelse(email_host == "users.noreply.github.com", email_user, NA)
-  )
-
-tf_gh_authors <- merge(tf_parsed_authors, tf_gh_authors, by="sha_id", all=TRUE)
-```
-
 
 # Data Summaries
 
@@ -455,13 +439,55 @@ ggplot(tf_commits_by_author_nobot %>%
 How many Google authors do we see?
 
 ```{r}
-ggplot(tf_commits_by_author_nobot %>% 
-         filter(commit_month > "Nov 2015" & author_commits_log > 1 & author_commits_log < 5), 
-       aes(x=factor(commit_month), y=commits_pct*100, colour=factor(commits_max))) + 
-  geom_jitter() +
-  xlab("Month") +
-  ylab("Commits per Author (%)") +
-  guides(colour=guide_legend(title="Commits")) +
+tf_authors_hosts <- tf_parsed %>%
+  filter(!email_host %in% c("gmail.com", 
+                            "users.noreply.github.com",
+                            "hotmail.com",
+                            "googlemail.com",
+                            "qq.com")) %>%
+  group_by(author, email_host) %>%
+  summarise(num_commits = n()) %>%
+  group_by(email_host) %>%
+  summarise(total_authors=n(), total_commits=sum(num_commits))
+
+tf_authors_hosts_month <- tf_parsed %>%
+  group_by(commit_month, author, email_host) %>%
+  summarise(num_commits = n()) %>%
+  group_by(commit_month, email_host) %>%
+  summarise(num_authors=n(), num_commits=sum(num_commits))
+
+# only include hosts with overall contributions > 1
+tf_authors_hosts_month_merge <- merge(tf_authors_hosts_month, 
+                                      tf_authors_hosts %>% select(email_host, total_authors, total_commits),
+                                      by="email_host")
+
+ggplot(tf_authors_hosts %>% filter(total_authors > 1),
+       aes(x=email_host, y=total_authors)) + 
+  geom_bar(stat="identity") +
+  xlab("Authors") +
+  ylab("Email Hosts") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+ggplot(tf_authors_hosts_month %>% 
+         mutate(is_google=ifelse(email_host=="google.com", "Google", "Not Google")),
+       aes(x=factor(commit_month), y=num_authors, fill=is_google)) + 
+  geom_bar(stat="identity") +
+  xlab("Months") +
+  ylab("Authors") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+ggplot(tf_authors_hosts_month_merge %>% filter(total_authors > 1),
+       aes(x=factor(commit_month))) + 
+  geom_line(aes(y=num_authors, colour=email_host, group=email_host)) +
+  xlab("Months") +
+  ylab("Authors") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+ggplot(tf_authors_hosts_month_merge %>% filter(total_authors > 1 & email_host != "google.com"),
+       aes(x=factor(commit_month), y=num_authors, fill=reorder(email_host, -total_authors))) + 
+  geom_bar(stat="identity") +
+  xlab("Months") +
+  ylab("Authors") +
   theme(axis.text.x = element_text(angle = 90, hjust = 1))
 ```
 
