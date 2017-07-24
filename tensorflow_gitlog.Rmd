@@ -565,19 +565,54 @@ Fri Jun 16 20:02:49 2017|Adriano Carmezim|Carmezim.filho@gmail.com|8560a4b
 
 The key advantage of git log analysis is that all of the information is available locally (once the repository has been cloned) and does not take up much space. This is particularly advantageous for older projects that may have a large number of commits.
 
-The key disadvantage is the inability to easily consolidate authors. While this may potentially misrepresent the distribution of commits for a small author base, a project with a large number of authors should not see a big problem. Number of unique authors can be checked against Github for an approximate margin of error.
+The key disadvantage is the inability to easily consolidate authors. Company affiliations identified through email address also need to be normalized and a change in company needs to be properly indicated for the new months. This was not fully addressed in this analysis. Tensorflow is a fairly young project so it isn't as significant here as it would be with an older project where more authors may have changed companies.
 
 The analysis of Tensorflow's commit history suggests that a growing project will trend towards a smaller proportion of overall commits per month per author. The overall number of commits per author on its own does not provide much insight into overall community health or growth. The proportion of commits per author and whether the same number of commits per author goes up or down in proportion, however, is an indicator of activity distribution and is a potentially useful metric.
-
-Commit months per author is an interesting metric for estimating project popularity. A high proportion of drive-by authors (authors with a low number of commit months or 100% shared commit months) indicates developers are actively using the project.
-
-Additionally, non-human users in projects with a high proportion of drive-by authors can be identified by a significantly higher proportion of commits than the other authors. The activity in this case is masked by an internal Google process so it's not clear what analysis would be beneficial without something else to compare to. However, projects with open governance that has clear "bot users" could be analyzed and used as a foundation for comparison.
 
 ## Proposed Metrics
 
 * commit months per author (number of months with at least one commit)
 * change in proportion of min/max commits per month
 * author commit proportion per month change
+
+## Proposed Theories
+
+### If a company has influence in a project, the majority of authors associated with that company will identify the association in their commit activity.
+
+It's not clear how accurate the company affiliation in the Github profile is. 
+
+* Name Normalization: This is a free-form text field and the names need to be normalized. 
+* No History: There is no public history of Github profile changes. If a contributor changes companies, all of their activity will be associated with the new company.
+* Authors could be contributing to the project DESPITE their company affiliation, not because of it.
+
+If an author's contributions are condoned by their company, they should be using company resources to make those contributions. Committers who use their work email address likely have a strong company affiliation or else they wouldn't be using company resources in such a publicly visible space. Committers who do not use their work email likely want to obscure their employer affiliation.
+
+Extracting company affiliation through commit email domain name is sufficient to identify company affiliation both historically and presently.
+
+### Commit months is a better indicator of company influence than number of commits. 
+
+Because it is not possible to accurately identify company affiliation for every single committer, rankings depending on the number of commits made by affiliated authors are insufficient for determining a company's involvement with a project.
+
+* A prolific committer can easily skew total commits
+* Committers identified through Github profiles have no historical context (see above)
+
+#### Commit months per company
+
+On the other hand, measuring whether a company had at least one author committing to the repository using their company email address will indicate whether or not the company had any involvement for a given time period. This also provides a clear historical pattern of activity, in particular how long the company has been represented in the project.
+
+#### Commit months per author per company
+
+Evaluating whether an affiliated author had at least one commit using their company email address indicates how much time a company is allowing its affilated authors to work upstream. If the company allows a significant proportion of their time to be spent upstream, the authors will have more consistent commit months. This also is not susceptible to potential skewing in the same way as numbers of commits.
+
+If the majority of authors has only one commit month, it suggests that while a company may have a large number of commits and a large number of authors, they may not be consistently engaging with the community.
+
+## Project Participation
+
+How the proportion of commits changes over time (what proporton is a min/max)
+
+Commit months per author is an interesting metric for estimating project popularity. A high proportion of drive-by authors (authors with a low number of commit months or 100% shared commit months) indicates developers are actively using the project.
+
+Additionally, non-human users in projects with a high proportion of drive-by authors can be identified by a significantly higher proportion of commits than the other authors. The activity in this case is masked by an internal Google process so it's not clear what analysis would be beneficial without something else to compare to. However, projects with open governance that has clear "bot users" could be analyzed and used as a foundation for comparison.
 
 # References
 
