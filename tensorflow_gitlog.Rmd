@@ -439,12 +439,16 @@ ggplot(tf_commits_by_author_nobot %>%
 How many Google authors do we see?
 
 ```{r}
+# filter out known email provider domains
 tf_authors_hosts <- tf_parsed %>%
   filter(!email_host %in% c("gmail.com", 
                             "users.noreply.github.com",
                             "hotmail.com",
                             "googlemail.com",
-                            "qq.com")) %>%
+                            "qq.com",
+                            "126.com",
+                            "163.com",
+                            "outlook.com")) %>%
   group_by(author, email_host) %>%
   summarise(num_commits = n()) %>%
   group_by(email_host) %>%
@@ -461,13 +465,7 @@ tf_authors_hosts_month_merge <- merge(tf_authors_hosts_month,
                                       tf_authors_hosts %>% select(email_host, total_authors, total_commits),
                                       by="email_host")
 
-ggplot(tf_authors_hosts %>% filter(total_authors > 1),
-       aes(x=email_host, y=total_authors)) + 
-  geom_bar(stat="identity") +
-  xlab("Authors") +
-  ylab("Email Hosts") +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1))
-
+# All emails vs google.com
 ggplot(tf_authors_hosts_month %>% 
          mutate(is_google=ifelse(email_host=="google.com", "Google", "Not Google")),
        aes(x=factor(commit_month), y=num_authors, fill=is_google)) + 
@@ -476,22 +474,43 @@ ggplot(tf_authors_hosts_month %>%
   ylab("Authors") +
   theme(axis.text.x = element_text(angle = 90, hjust = 1))
 
-ggplot(tf_authors_hosts_month_merge %>% filter(total_authors > 1),
-       aes(x=factor(commit_month))) + 
-  geom_line(aes(y=num_authors, colour=email_host, group=email_host)) +
-  xlab("Months") +
-  ylab("Authors") +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1))
-
+# Non-email-provider addresses and more than one overall author (otherwise there are too many to plot)
 ggplot(tf_authors_hosts_month_merge %>% filter(total_authors > 1 & email_host != "google.com"),
        aes(x=factor(commit_month), y=num_authors, fill=reorder(email_host, -total_authors))) + 
   geom_bar(stat="identity") +
   xlab("Months") +
   ylab("Authors") +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  guides(fill=guide_legend(title="Hosts"))
 ```
 
-Are the responsible for most of the 1-month contributors?
+Are they responsible for most of the 1-month contributors?
+
+Authors commiting with google.com email domains are only responsible for a small proportion of the single commit month activity. While it's the largest proportion of any non-email-provider host, it's not likely that Google is dominating the single-month committer population.
+
+```{r}
+tf_commits_hosts <- merge(tf_commits_by_author %>% filter(commits_months == 1), 
+                          tf_parsed %>% select(author, commit_month, email_host, email_id),
+                          by=c("author", "commit_month"))
+tf_commits_hosts <- tf_commits_hosts %>% 
+  group_by(commit_month, author, email_host) %>%
+  summarise(commits=n(), email_id=first(email_id)) %>%
+  group_by(commit_month, author) %>%
+  mutate(num_hosts=n_distinct(email_host)) %>%
+  group_by(commit_month, email_host) %>%
+  mutate(host_authors=n_distinct(author)) %>%
+  group_by(email_host) %>%
+  mutate(total_authors=n_distinct(author))
+
+ggplot(tf_commits_hosts %>% filter(host_authors > 1),
+       aes(x=factor(commit_month), y=num_hosts, fill=reorder(email_host, -total_authors))) + 
+  geom_bar(stat="identity") +
+  xlab("Months") +
+  ylab("Authors w/ 1 Commit Month") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  guides(fill=guide_legend(title="Hosts"))
+```
+
 
 # Github Pulse Report Comparison
 
@@ -552,7 +571,13 @@ The analysis of Tensorflow's commit history suggests that a growing project will
 
 Commit months per author is an interesting metric for estimating project popularity. A high proportion of drive-by authors (authors with a low number of commit months or 100% shared commit months) indicates developers are actively using the project.
 
-Additionally, non-human users in projects with a high proportion of drive-by authors can be identified by a significantly higher proportion of commits than the other authors. TODO: how does a non-human author compare to a long-term author?
+Additionally, non-human users in projects with a high proportion of drive-by authors can be identified by a significantly higher proportion of commits than the other authors. The activity in this case is masked by an internal Google process so it's not clear what analysis would be beneficial without something else to compare to. However, projects with open governance that has clear "bot users" could be analyzed and used as a foundation for comparison.
+
+## Proposed Metrics
+
+* commit months per author (number of months with at least one commit)
+* change in proportion of min/max commits per month
+* author commit proportion per month change
 
 # References
 
