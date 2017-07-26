@@ -607,19 +607,19 @@ The analysis of Tensorflow's commit history suggests that a growing project will
 
 ### Commit Months
 
-Frequency of months with at least one commit
+Frequency of months with at least one commit. Shows consistency in involvement over time.
 
 ### Commit Delta
 
-Rate of change in commit frequency
+Rate of change in commit frequency. An overall low rate of change suggests a high proportion of new authors.
 
 ### Commit Deviation
 
-Frequency of change in commit frequency
+Frequency of change in commit frequency. A high frequency suggests a high proportion of new authors.
 
 ### Commit Percent Change
 
-Commit frequency percent change
+Commit frequency percent change. A high decrease suggests an increase in overall commit distribution per author.
 
 ## Next Steps
 
