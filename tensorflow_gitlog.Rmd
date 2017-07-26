@@ -250,7 +250,9 @@ paste("Difference from Github:", total_authors - 995)
 
 ##  Pulse Report
 
-This Pulse report shows the same number of commits and 1 additional author. Since our total unique authors count is off by 6, and the number of commits is correct, we can assume that this is either due to overzealous author grouping on our part or an author having multiple Github accounts.
+This Pulse report shows the same number of commits and 1 additional author. Since our total unique authors count is off by 6, and the number of commits is correct, we have to assume there is a problem with the author normalization. A manual verification of authors who had more than one distinct email address all pointed to the same Github accounts. Timezones could be another factor, this report uses UTC to normalize the time zones and it's not clear if Git is using local or UTC for its total. We can't recreate the Pulse snapshot because the tensorflow-gardener continually "rewrites" the commit log history.
+
+Overall a discrepancy of 1 author isn't significant. 
 
 According to the Github Pulse Report, "Excluding merges, 155 authors have pushed 838 commits to master and 850 commits to all branches. On master, 2,554 files have changed and there have been 147,210 additions and 122,083 deletions."
 
@@ -273,8 +275,7 @@ paste("Total Commits: ", total_commits_pulse_check)
 paste("Difference From Pulse Check: ", total_commits_pulse_check - 838)
 ```
 
-
-Our methods for counting commits match Github's results. Despite the author discrepancy, the method appears to sufficiently accurate for the purposes of this analysis.
+Therefore, we can conclude that our methods for counting commits match Github's results. Despite our previous author discrepancy, the method appears to sufficiently accurate for the purposes of this analysis.
 
 # Authors
 
