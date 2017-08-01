@@ -42,6 +42,7 @@ build_authors_lookup <- function(authors, email_provider_domains) {
   # One Name to Many Emails - find emails associated with the same author name
   authors_email_single <- authors %>% filter(email_freq > 1 & name_freq == 1)
   
+  # set email_id by latest commit or if they ever used a non-provider email
   authors_email_single_lookup <- authors_email_single %>%
     group_by(name) %>%
     arrange(desc(last_commit)) %>%
@@ -93,7 +94,7 @@ build_authors_lookup <- function(authors, email_provider_domains) {
   # dedupe
   authors_lookup <- unique(authors_merge)
   
-  # set email_id if they ever used a non-provider email
+  # extract email hosts
   authors_lookup <- authors_lookup %>%
     separate(email, c("email_user", "email_host"), "@", remove=FALSE) %>%
     separate(email_id, c("email_id_user", "email_id_host"), "@", remove=FALSE) %>%

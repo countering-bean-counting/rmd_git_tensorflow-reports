@@ -146,7 +146,6 @@ ggplot(data = tf_gh_octoverse,
 
 ```
 
-
 ## Looking for Patterns
 
 ```{r}
@@ -243,7 +242,6 @@ ggplot(data = tf_gh_event_types_summary_total,
 ### Events Contributed by Diverse Type Actors
 
 How many events do actors who contribute in the top event type frequencies typically have per type? What's "normal" for active contributors?
-
 
 # Events vs Commits
 
