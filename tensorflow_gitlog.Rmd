@@ -303,7 +303,7 @@ ggplot(tf_authors_hosts_month %>%
          mutate(is_google=ifelse(email_id_host=="google.com" | email_id_host=="tensorflow.org", 
                                  "Google", "Not Google")),
        aes(x=factor(commit_month), y=num_authors, fill=is_google)) + 
-  geom_bar(stat="identity") +
+  geom_bar(stat="identity", position="dodge") +
   xlab("Months") +
   ylab("Authors") +
   theme(axis.text.x = element_text(angle = 90, hjust = 1))
@@ -320,7 +320,7 @@ ggplot(tf_authors_hosts_month_merge %>%
   xlab("Months") +
   ylab("Authors") +
   theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
-  guides(fill=guide_legend(title="Hosts"))
+  guides(fill=guide_legend(title="Hosts", ncol = 2))
 
 ```
 
